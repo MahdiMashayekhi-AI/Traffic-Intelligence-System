@@ -1,0 +1,48 @@
+[project]
+name = "traffic-intelligence-system"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Mahdi Mashayekhi", email = "mahdimashayekhi.ai@gmail.com" }
+]
+requires-python = "==3.12.*"
+dependencies = [
+    "numpy>=2.5.3",
+    "opencv-python>=5.0.0.93",
+    "sqlalchemy>=2.1.1",
+    "streamlit>=1.64.0",
+    "torch",
+    "torchvision",
+    "ultralytics>=8.4.164",
+]
+
+[project.scripts]
+traffic-intelligence-system = "traffic_intelligence_system:main"
+
+[build-system]
+requires = ["uv_build>=0.12.19,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+torch = { path = "D:/Packages/torch-2.9.0+cu128-cp312-cp312-win_amd64.whl" }
+torchvision = { path = "D:/Packages/torchvision-0.24.0+cu128-cp312-cp312-win_amd64.whl" }
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.2",
+    "pytest>=9.1.1",
+    "ruff>=0.16.9",
+]
+
+[tool.ruff]
+line-length = 90
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
