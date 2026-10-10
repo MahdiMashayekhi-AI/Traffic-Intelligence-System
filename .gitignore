@@ -222,3 +222,6 @@ data/**
 
 # Outputs
 outputs/
+
+# Test codes
+scratch/
