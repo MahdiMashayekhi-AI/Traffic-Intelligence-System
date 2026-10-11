@@ -1,7 +1,7 @@
 [project]
 name = "traffic-intelligence-system"
 version = "0.1.0"
-description = "Add your description here"
+description = "Traffic analytics system: vehicle/pedestrian detection, tracking and event analytics."
 readme = "README.md"
 authors = [
     { name = "Mahdi Mashayekhi", email = "mahdimashayekhi.ai@gmail.com" }
@@ -18,12 +18,16 @@ dependencies = [
     "ultralytics>=8.4.164",
 ]
 
-[project.scripts]
-traffic-intelligence-system = "traffic_intelligence_system:main"
-
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.uv]
+default-groups = ["dev", "data-tools"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
@@ -50,6 +54,13 @@ dev = [
     "pre-commit>=4.6.2",
     "pytest>=9.1.1",
     "ruff>=0.16.9",
+]
+data-tools = [
+    "pyyaml",
+    "pandas",
+    "matplotlib",
+    "scikit-learn",
+    "pillow",
 ]
 
 [tool.ruff]

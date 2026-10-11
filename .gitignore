@@ -217,11 +217,17 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Datasets
+# Datasets: ignore everything under data/ except docs and manifests
 data/**
+!data/README.md
+!data/manifests/
+!data/manifests/**
 
 # Outputs
+runs/
 outputs/
 
 # Test codes
 scratch/
+PROJECT_CONTENTS.md
+PROJECT_STRUCTURE.md
