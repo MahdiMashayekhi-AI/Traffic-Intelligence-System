@@ -97,10 +97,11 @@ def count_instances(labels_dir: Path) -> dict[int, int]:
 def stats_to_markdown(
     stats_by_split: dict[str, SplitStats],
     class_names: list[str],
+    title: str = "Dataset Statistics",
 ) -> str:
     lines: list[str] = []
 
-    lines.append("# Dataset Statistics")
+    lines.append(f"# {title}")
     lines.append("")
     lines.append(
         "| split | images | label files | matched | empty labels "

@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,6 +23,11 @@ class MatchResult:
     labels_without_image: list[Path]
 
 
+def _range_str(name: str) -> str:
+    # x/y: [0, 1]  —  w/h: (0, 1]
+    return "[0, 1]" if name in ("x", "y") else "(0, 1]"
+
+
 def parse_label_line(line: str) -> Box:
     tokens = line.split()
 
@@ -31,28 +37,36 @@ def parse_label_line(line: str) -> Box:
     try:
         class_id = int(tokens[0])
     except ValueError:
-        raise ValueError("class id must be an integer")
+        raise ValueError(f"class id must be an integer, got {tokens[0]!r}")
 
     if class_id < 0:
-        raise ValueError("class id must be positive")
+        raise ValueError(f"class id must be non-negative, got {class_id}")
 
-    try:
-        x = float(tokens[1])
-        y = float(tokens[2])
-        w = float(tokens[3])
-        h = float(tokens[4])
-    except ValueError:
-        raise ValueError("coordinates must be numbers")
+    values = {}
+    for name, token in zip(("x", "y", "w", "h"), tokens[1:]):
+        try:
+            values[name] = float(token)
+        except ValueError:
+            raise ValueError(f"{name} must be a float, got {token!r}")
 
-    if (
-        not (0.0 <= x <= 1.0)
-        or not (0.0 <= y <= 1.0)
-        or not (0.0 < w <= 1.0)
-        or not (0.0 < h <= 1.0)
-    ):
-        raise ValueError("value is not in the correct range")
+    ranges = {
+        "x": (0.0, True),
+        "y": (0.0, True),
+        "w": (0.0, False),
+        "h": (0.0, False),
+    }
 
-    return Box(class_id, x, y, w, h)
+    for name, value in values.items():
+        lower, lower_inclusive = ranges[name]
+        if not math.isfinite(value):
+            raise ValueError(
+                f"{name} must be a finite number in {_range_str(name)}, got {value}"
+            )
+        lower_ok = value >= lower if lower_inclusive else value > lower
+        if not (lower_ok and value <= 1.0):
+            raise ValueError(f"{name} must be in {_range_str(name)}, got {value}")
+
+    return Box(class_id, values["x"], values["y"], values["w"], values["h"])
 
 
 def read_label_file(path: Path) -> tuple[list[Box], list[str]]:
@@ -62,31 +76,61 @@ def read_label_file(path: Path) -> tuple[list[Box], list[str]]:
     boxes = []
     errors = []
 
-    for i, line in enumerate(lines, start=1):
-        line = line.strip()
-        if line == "":
+    for i, raw_line in enumerate(lines, start=1):
+        stripped = raw_line.strip()
+        if stripped == "":
             continue
 
         try:
-            box = parse_label_line(line)
+            box = parse_label_line(stripped)
             boxes.append(box)
         except ValueError as e:
-            errors.append(f"path: {path.name}\nline {i}: {e}\n{line}")
+            errors.append(f"{path.name}:{i}: {e}; line={raw_line!r}")
 
     return boxes, errors
 
 
-def load_class_names(yaml_path: Path) -> list[str]:
+def load_class_names(yaml_path: Path | str) -> list[str]:
     with open(yaml_path, mode="r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
-    if isinstance(data["names"], list):
-        return [name for name in data["names"]]
-    elif isinstance(data["names"], dict):
-        names = dict(sorted(data["names"].items()))
-        return [name for name in names.values()]
+    if not isinstance(data, dict):
+        raise ValueError(f"{yaml_path}: expected a mapping at top level")
+
+    if "names" not in data:
+        raise ValueError(f"{yaml_path}: missing 'names' key")
+
+    names = data["names"]
+
+    if not names:
+        raise ValueError(f"{yaml_path}: names is empty")
+
+    if isinstance(names, list):
+        result = list(names)
+
+    elif isinstance(names, dict):
+        if not all(isinstance(k, int) and not isinstance(k, bool) for k in names):
+            raise ValueError(f"{yaml_path}: names keys must be integers")
+
+        keys = sorted(names.keys())
+        if keys[0] != 0 or keys[-1] != len(keys) - 1:
+            raise ValueError(f"{yaml_path}: names must be contiguous starting from 0")
+
+        result = [names[k] for k in keys]
+
     else:
-        raise ValueError("names must be a list or a dictionary")
+        raise ValueError(f"{yaml_path}: names must be a list or a dictionary")
+
+    for idx, name in enumerate(result):
+        if not isinstance(name, str):
+            raise ValueError(
+                f"{yaml_path}: name at index {idx} must be a string, "
+                f"got {type(name).__name__}"
+            )
+        if name == "":
+            raise ValueError(f"{yaml_path}: name at index {idx} must be non-empty")
+
+    return result
 
 
 def get_split_dirs(root: Path, split: str, layout: str) -> tuple[Path, Path]:

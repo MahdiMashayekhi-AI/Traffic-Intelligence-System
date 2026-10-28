@@ -1,9 +1,9 @@
-# Dataset Statistics
+# Dataset Statistics: CityPersons
 
 | split | images | label files | matched | empty labels | images w/o label | labels w/o image | invalid lines |
 |---|---|---|---|---|---|---|---|
 | train | 2975 | 2975 | 2975 | 486 | 0 | 0 | 0 |
-| val | 502 | 500 | 500 | 61 | 2 | 0 | 0 |
+| val | 500 | 500 | 500 | 61 | 0 | 0 | 0 |
 | test | 1525 | 0 | 0 | 0 | 1525 | 0 | 0 |
 
 ### train
