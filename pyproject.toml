@@ -57,6 +57,7 @@ dev = [
     "ruff>=0.16.9",
 ]
 data-tools = [
+    "numpy",
     "pyyaml",
     "pandas",
     "matplotlib",

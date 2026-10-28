@@ -1,6 +1,6 @@
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_FILE = ROOT / "PROJECT_STRUCTURE.md"
 
 EXCLUDED_DIRS = {
@@ -10,6 +10,8 @@ EXCLUDED_DIRS = {
     ".git",
     ".idea",
     ".vscode",
+    ".ruff_cache",
+    ".pytest_cache",
 }
 
 IMAGE_EXTENSIONS = {
@@ -25,7 +27,7 @@ IMAGE_EXTENSIONS = {
     ".avif",
 }
 
-DATA_DIRS = {"raw", "processed"}
+DATA_DIRS = {"raw", "processed", "interim"}
 
 
 def should_skip_file(path: Path) -> bool:

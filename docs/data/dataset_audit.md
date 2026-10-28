@@ -2,20 +2,30 @@
 
 ## Summary
 
-The raw UA-DETRAC and CityPersons datasets were audited for image-label matching, label validity, class distribution, potential train/test leakage, filename patterns, and image dimensions. The main findings were that CityPersons test images have no labels, UA-DETRAC has no separate validation split, and the two datasets use different image resolutions. The sampled visual similarity check did not reveal obvious train/test duplicates, and UA-DETRAC train/test sequences had no shared sequence IDs.
+The raw UA-DETRAC and CityPersons datasets were audited for image-label matching, label validity, class distribution, potential train/test leakage, filename patterns, and image dimensions. Verified findings: CityPersons raw labels use class ID `4` while its `data.yaml` declares `0: person`; the current CityPersons validation snapshot has 500 images and 500 labels with **zero** images without labels (the earlier committed audit's count of 2 is stale); UA-DETRAC contains no duplicate `(sequence_id, frame_number)` pairs in either split; UA-DETRAC train (32 sequences) and test (13 sequences) share no sequence IDs. The loss of seven car instances during UA-DETRAC class merging remains **unresolved** because the Roboflow source is not accessible without an API key (403 Forbidden).
 
 ## Findings
 
 | # | Issue | Evidence | Decision |
 |---|---|---|---|
-| 1 | CityPersons test has no labels | `audit_raw_citypersons.md`: 1,525 test images, 0 label files | Treat CityPersons test as unlabeled data. Use the labeled validation split for validation; do not assume the test split is an official validation set. |
-| 2 | UA-DETRAC has no separate validation split | The dataset contains `train` and `test` folders only | Create a validation split from the training data later, grouping by source video ID to avoid placing frames from the same sequence in both train and validation. |
-| 3 | UA-DETRAC car instance count mismatch | Training car count: 222,021; expected count: 222,028; difference: 7 instances | Unresolved. Original labels were unavailable for comparison, so the discrepancy was documented without further modification. |
-| 4 | Potential train/test leakage in UA-DETRAC | Train: 32 unique sequence IDs; test: 13 unique sequence IDs; shared IDs: 0. Visual nearest-neighbor inspection of 8 test images from different sequences found no obvious duplicate or near-identical train images. | The sequence-level split appears separated. No obvious leakage was found in the sampled images, but this limited inspection does not prove that the entire dataset is free of duplicates. |
-| 5 | UA-DETRAC filename pattern | Filenames follow the pattern `MVI_<sequence_id>_frame<frame_id>_...`. The training split contains 32 sequence IDs and the test split contains 13, with no overlap. | Extract the `MVI_<sequence_id>` prefix and use it as the grouping key when creating future splits. |
-| 6 | Image dimensions | UA-DETRAC train: 34,374 images at 960 × 540; UA-DETRAC test: 15,292 images at 960 × 540; CityPersons train: 2,975 images at 2048 × 1024; CityPersons val: 502 images at 2048 × 1024. All checked images were readable, with zero errors. | Record these dimensions as the baseline for EDA and preprocessing. Revisit resizing and input resolution when configuring model training. |
-| 7 | Empty labels in CityPersons | Train: 486 empty label files; val: 61 empty label files. No invalid label lines were reported. | Preserve these findings and inspect empty labels before deciding whether they represent legitimate images without target objects or annotation issues. |
-| 8 | UA-DETRAC label class mapping | The final dataset uses four classes: `car`, `van`, `bus`, and `others`. The original class IDs were merged into four target classes. | Use the documented mapping consistently in label parsing, statistics, training, and evaluation. |
+| 1 | CityPersons raw class IDs vs. `data.yaml` | `count_instances` on `data/raw/citypersons/labels/train` → `{4: 20974}`; on `.../labels/val` → `{4: 4153}`. Sample label line: `4 0.635986...`. `data/raw/citypersons/data.yaml` declares `names: {0: person}`. Legacy script `scratch/old_scripts/ped_change_dataset_class.py` rewrites every class to `"4"`. | Document the discrepancy: raw labels use class ID `4`, YAML maps `0: person`. The class conversion history (legacy script rewriting all classes to `4`) explains why raw labels contain `4`. |
+| 2 | CityPersons validation images without labels | `get_split_dirs` + `match_images_to_labels` on `data/raw/citypersons` (type-first, val): 500 images, 500 labels, `images_without_label = []` (0). The prior committed audit recorded 2 without labels, but those are not present in the current data snapshot. | No images are currently without labels in the val split. Policy recorded: any val image without a label is excluded from the future `traffic_v1` dataset. |
+| 3 | UA-DETRAC car instance count mismatch (7 missing) | Merged training car count = 222,021. Expected original classes `{0, 5}` sum = 40,515 + 181,513 = 222,028. Difference = 7 instances. Original Roboflow dataset could not be downloaded (403 Forbidden, requires API key). | **Unresolved.** Original labels unavailable for comparison. Root cause cannot be established from available evidence. |
+| 4 | Potential train/test leakage in UA-DETRAC | Train: 32 unique sequence IDs; test: 13 unique sequence IDs; shared IDs: 0. Filename pattern `MVI_<sequence>_frame<frame>_jpg.rf.<hash>.jpg` parsed with `re` named groups. | The sequence-level split is separated with no shared sequence IDs. No duplication detected; this inspection does not prove the entire dataset is free of duplicates, but no evidence of leakage was found. |
+| 5 | UA-DETRAC duplicate-frame / augmentation check | Train: 34,374 images, 34,374 unique `(sequence_id, frame_number)` pairs, 0 additional, 0 unparseable. Test: 15,292 images, 15,292 unique pairs, 0 additional, 0 unparseable. | No duplicate sequence/frame pairs were detected in either split; no evidence of augmentation-derived duplicates. |
+| 6 | Image dimensions | UA-DETRAC train: 34,374 images at 960 × 540; UA-DETRAC test: 15,292 images at 960 × 540; CityPersons train: 2,975 images at 2048 × 1024; CityPersons val: 500 images at 2048 × 1024; CityPersons test: 1,525 images at 2048 × 1024. | Record as baseline for EDA and preprocessing. |
+| 7 | Empty labels in CityPersons | Train: 486 empty label files; val: 61 empty label files. No invalid label lines were reported. | Retain empty labels as background samples. Limitation: regions ignored by the annotation protocol may contain pedestrians that are not labeled (verified annotation format: YOLO `class x y w h`; empty files contain no box lines). |
+| 8 | UA-DETRAC label class mapping | The merged dataset uses four classes: `car`, `van`, `bus`, `others`. Original IDs merged: `{0, 5} → car`, `{1, 7} → van`, `{2, 4} → bus`, `{3, 6} → others` (legacy `scratch/old_scripts/veh_merge_classes.py`). | Use the documented mapping consistently in label parsing, statistics, training, and evaluation. Original labels were modified in place; preserve originals in a separate directory for future transformations. |
+
+## CityPersons Split Strategy (Finding 1 policy)
+
+Verified directory layout (`data/raw/citypersons/images/`):
+- `train`: 18 cities (aachen, bochum, bremen, cologne, darmstadt, dusseldorf, erfurt, hamburg, hanover, jena, krefeld, monchengladbach, strasbourg, stuttgart, tubingen, ulm, weimar, zurich)
+- `val`: 3 cities (frankfurt, lindau, munster)
+- `test`: 6 cities (berlin, bielefeld, bonn, leverkusen, mainz, munich)
+- Train/val city overlap: none.
+
+Documented split policy: use distinct city sets for training and validation; reserve the official CityPersons test split as the test set. The actual layout is consistent with a city-separated train/val/test split (no shared cities). Note: the actual training set contains 18 cities, not 15 as sometimes planned; documentation should reflect the actual layout rather than a planned 15-city subset.
 
 ## Raw Data Modification Note
 
@@ -37,4 +47,4 @@ names:
   - others
 ```
 
-Because the original UA-DETRAC labels were modified in place, the original class annotations may not be recoverable from the processed files alone. Future dataset transformations should preferably preserve the original data and write modified annotations to a separate processed-data directory.
+Because the original UA-DETRAC labels were modified in place, the original class annotations may not be recoverable from the processed files alone. Future dataset transformations should preferably preserve the original data and write modified annotations to a separate processed-data directory (e.g., `data/raw/ua_detrac_original/`).
